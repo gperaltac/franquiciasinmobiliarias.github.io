@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML a CSV Converter</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        input { margin: 1rem 0; }
+        button { background-color: #2ea44f; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+        button:hover { background-color: #2c974b; }
+        #status { margin-top: 1rem; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Convertidor de XML a CSV</h2>
+    <p>Selecciona tu archivo XML para transformarlo</p>
+    <input type="file" id="fileInput" accept=".xml">
+    <br>
+    <button onclick="convertXML()">Convertir y Descargar</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    function convertXML() {
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        
+        if (fileInput.files.length === 0) {
+            status.innerText = "Por favor, selecciona un archivo primero.";
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const xmlText = e.target.result;
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+            // Lógica de conversión (Asumiendo una estructura repetitiva)
+            // Cambia 'item' por el nombre de la etiqueta que se repite en tu XML
+            const items = xmlDoc.querySelectorAll("* > *"); 
+            
+            if (items.length === 0) {
+                status.innerText = "No se encontraron datos en el XML.";
+                return;
+            }
+
+            let csvContent = "";
+            let headers = [];
+
+            // Obtener encabezados del primer elemento con hijos
+            const firstRowChildren = items[0].children;
+            for (let child of firstRowChildren) {
+                headers.push(child.tagName);
+            }
+            csvContent += headers.join(",") + "\n";
+
+            // Obtener filas
+            items.forEach(item => {
+                if (item.children.length > 0) {
+                    let row = [];
+                    headers.forEach(header => {
+                        let val = item.getElementsByTagName(header)[0]?.textContent || "";
+                        // Escapar comas para que no rompan el CSV
+                        row.push(`"${val.replace(/"/g, '""')}"`);
+                    });
+                    csvContent += row.join(",") + "\n";
+                }
+            });
+
+            downloadCSV(csvContent, file.name.replace(".xml", ".csv"));
+            status.innerText = "¡Conversión exitosa!";
+        };
+
+        reader.readAsText(file);
+    }
+
+    function downloadCSV(content, fileName) {
+        const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
