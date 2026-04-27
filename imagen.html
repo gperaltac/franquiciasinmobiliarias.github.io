@@ -3,50 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editor de Imágenes Simple</title>
+    <title>Editor Pro - Vista Previa en Tiempo Real</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #f4f4f9; padding: 20px; }
-        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; width: 100%; }
-        canvas { max-width: 100%; height: auto; border: 1px solid #ccc; margin-top: 15px; display: none; }
-        .controls { display: grid; gap: 10px; margin-bottom: 15px; }
-        input, button { padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #218838; }
-        #downloadBtn { background: #007bff; display: none; margin-top: 10px; }
+        :root { --primary: #4f46e5; --bg: #f8fafc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .editor-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-width: 800px; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .editor-container { grid-template-columns: 1fr; } }
+        
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .preview-area { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 10px; min-height: 300px; background: #fff; }
+        
+        canvas { max-width: 100%; height: auto; border-radius: 4px; display: none; }
+        .placeholder-text { color: #94a3b8; text-align: center; }
+        
+        label { font-weight: 600; font-size: 0.9rem; color: #475569; margin-bottom: -10px; }
+        input, select { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; outline: none; }
+        input:focus { border-color: var(--primary); ring: 2px var(--primary); }
+        
+        .btn-download { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; margin-top: 10px; }
+        .btn-download:disabled { background: #94a3b8; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Agregar Texto a Imagen</h2>
+<div class="editor-container">
     <div class="controls">
+        <h2 style="margin-top:0">Editor de Imagen</h2>
+        
+        <label>1. Sube tu imagen</label>
         <input type="file" id="upload" accept="image/*">
-        <input type="text" id="textInput" placeholder="Escribe tu texto aquí...">
-        <button id="renderBtn">Aplicar Texto</button>
+        
+        <label>2. Escribe el texto</label>
+        <input type="text" id="textInput" placeholder="Ej: Oferta Inmobiliaria..." maxlength="50">
+        
+        <label>3. Posición del texto</label>
+        <select id="position">
+            <option value="bottom">Abajo</option>
+            <option value="center">Centro</option>
+            <option value="top">Arriba</option>
+        </select>
+
+        <label>4. Color de letra</label>
+        <input type="color" id="textColor" value="#ffffff" style="height: 45px; padding: 2px;">
+
+        <button id="downloadBtn" class="btn-download" disabled>Descargar Imagen</button>
     </div>
-    
-    <canvas id="canvas"></canvas>
-    <button id="downloadBtn">Descargar Imagen</button>
+
+    <div class="preview-area">
+        <div id="placeholder" class="placeholder-text">La vista previa aparecerá aquí</div>
+        <canvas id="canvas"></canvas>
+    </div>
 </div>
 
 <script>
     const upload = document.getElementById('upload');
     const textInput = document.getElementById('textInput');
-    const renderBtn = document.getElementById('renderBtn');
+    const position = document.getElementById('position');
+    const textColor = document.getElementById('textColor');
     const downloadBtn = document.getElementById('downloadBtn');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const placeholder = document.getElementById('placeholder');
 
     let imgElement = new Image();
 
-    // Cargar imagen al seleccionar archivo
+    // Eventos para actualizar en tiempo real
+    [textInput, position, textColor].forEach(el => {
+        el.addEventListener('input', drawImageWithText);
+    });
+
     upload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = (event) => {
             imgElement.src = event.target.result;
         };
-        reader.readAsDataURL(e.target.files[0]);
+        reader.readAsDataURL(file);
     });
 
     imgElement.onload = () => {
+        placeholder.style.display = 'none';
+        canvas.style.display = 'block';
+        downloadBtn.disabled = false;
+        drawImageWithText();
+    };
+
+    function drawImageWithText() {
+        if (!imgElement.src) return;
+
+        // Ajustar dimensiones del canvas a la imagen original
         canvas.width = imgElement.width;
+        canvas.height = imgElement.height;
+
+        // Dibujar imagen base
+        ctx.drawImage(imgElement, 0, 0);
+
+        // Estilos del texto
+        const text = textInput.value;
+        const fontSize = canvas.width * 0.07; 
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.fillStyle = textColor.value;
+        ctx.textAlign = "center";
+        
+        // Sombra/Borde para legibilidad
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = 15;
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = fontSize * 0.08;
+
+        // Cálculo de posición vertical
+        let yPos;
+        if (position.value === 'top') yPos = fontSize * 1.5;
+        else if (position.value === 'center') yPos = canvas.height / 2;
+        else yPos = canvas.height - (fontSize);
+
+        const xPos = canvas.width / 2;
+
+        // Dibujar texto (trazo y luego relleno)
+        ctx.strokeText(text, xPos, yPos);
+        ctx.fillText(text, xPos, yPos);
+    }
+
+    downloadBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = 'edit-image-' + Date.now() + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+</script>
+
+</body>
+</html>
